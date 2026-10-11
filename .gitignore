@@ -1,0 +1,25 @@
+# Env
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Data / warehouse (generated locally)
+warehouse/*
+!warehouse/.gitkeep
+generator/out/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Spark
+spark-warehouse/
+derby.log
+metastore_db/
