@@ -62,29 +62,15 @@ themselves** (not hand-maintained docs that go stale).
 
 ---
 
-## Build phases
-
-Each phase has a runbook in `runbooks/` (commands, decisions, verification, failures).
-
-| Phase | Name                     | Delivers                                        | Status |
-|-------|--------------------------|-------------------------------------------------|--------|
-| 00    | Scaffold & decisions     | repo layout, ADRs, this README                  | ✅     |
-| 01    | Infrastructure           | docker-compose: MinIO, Spark, Iceberg, etc.     | ✅     |
-| 02    | Event generator          | synthetic streaming data source                 | 🔜     |
-| 03    | Bronze/Silver/Gold ETL   | Spark jobs building the lakehouse               | 🔜     |
-| 04    | Airflow orchestration    | DAGs chaining the pipeline                       | 🔜     |
-| 05    | Lineage extractor        | column-level lineage from Spark plans           | 🔜     |
-| 06    | Graph + search load      | Neo4j + OpenSearch population                    | 🔜     |
-| 07    | GraphQL API              | impact / lineage / discovery endpoints          | 🔜     |
-
----
-
 ## Quick start
 
 ```bash
 cp .env.example .env
 make up          # start all infrastructure
 make ps          # verify services are healthy
+make urls        # print service URLs + credentials
 ```
 
-See `runbooks/phase-01-infrastructure/README.md` for service URLs and verification steps.
+- **Build roadmap:** see [docs/roadmap.md](docs/roadmap.md).
+- **Per-stage commands, verification, and notes:** see [runbooks/](runbooks/).
+- **Architecture decisions:** see [docs/adr/](docs/adr/).
