@@ -1,0 +1,147 @@
+# Lakehouse Metadata & Lineage Platform — core infrastructure (Phase 01).
+# Airflow is added in Phase 04 (its own compose overlay) to keep the first boot light.
+#
+#   bring up:   make up      tear down:   make down     status:  make ps
+name: lakehouse-platform
+
+networks:
+  lakehouse:
+    driver: bridge
+
+volumes:
+  minio-data:
+  neo4j-data:
+  opensearch-data:
+
+services:
+  # ---------------------------------------------------------------- object store
+  # NOTE: MinIO gated their own Docker Hub images (minio/minio, minio/mc) behind a license
+  # in 2025. bitnamilegacy/minio is the same MinIO server, still publicly pullable, and it
+  # auto-creates the warehouse bucket via MINIO_DEFAULT_BUCKETS — so no mc init container.
+  minio:
+    image: bitnamilegacy/minio:latest
+    container_name: lh-minio
+    hostname: minio
+    networks: [lakehouse]
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console -> http://localhost:9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_DEFAULT_BUCKETS: ${WAREHOUSE_BUCKET}
+    volumes:
+      - minio-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # ---------------------------------------------------------------- iceberg catalog
+  iceberg-rest:
+    image: tabulario/iceberg-rest:1.6.0
+    container_name: lh-iceberg-rest
+    hostname: iceberg-rest
+    networks: [lakehouse]
+    ports:
+      - "8181:8181"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      CATALOG_WAREHOUSE: s3://${WAREHOUSE_BUCKET}/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: ${S3_ENDPOINT}
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+
+  # ---------------------------------------------------------------- spark (dev + submit)
+  # Spark 3.5 with Iceberg jars + Jupyter preinstalled. We submit jobs here.
+  spark:
+    image: tabulario/spark-iceberg:latest
+    container_name: lh-spark
+    hostname: spark
+    networks: [lakehouse]
+    depends_on:
+      iceberg-rest:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    ports:
+      - "8888:8888"   # Jupyter
+      - "8080:8080"   # Spark master UI
+      - "4040:4040"   # Spark app UI
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+    volumes:
+      - ./spark-jobs:/opt/spark-jobs
+      - ./lineage:/opt/lineage
+      - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    entrypoint: >
+      /bin/sh -c "
+      notebook &
+      tail -f /dev/null
+      "
+
+  # ---------------------------------------------------------------- lineage graph
+  neo4j:
+    image: neo4j:5-community
+    container_name: lh-neo4j
+    hostname: neo4j
+    networks: [lakehouse]
+    ports:
+      - "7474:7474"   # browser -> http://localhost:7474
+      - "7687:7687"   # bolt
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # ---------------------------------------------------------------- discovery search
+  opensearch:
+    image: opensearchproject/opensearch:2.17.0
+    container_name: lh-opensearch
+    hostname: opensearch
+    networks: [lakehouse]
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      DISABLE_SECURITY_PLUGIN: "true"   # local dev only
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.17.0
+    container_name: lh-opensearch-dashboards
+    networks: [lakehouse]
+    ports:
+      - "5601:5601"   # -> http://localhost:5601
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
