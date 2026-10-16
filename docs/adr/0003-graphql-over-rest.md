@@ -1,31 +1,34 @@
-# ADR 0003 — GraphQL for the platform API (over REST)
+# 0003 — GraphQL for the API
 
-**Status:** Accepted · **Date:** 2026-10-11
+Status: accepted · 2026-10-11
 
 ## Context
-The platform serves lineage, impact, schema-history, and discovery to other teams and tools.
-Responses are nested graphs of variable depth ("this column, its upstreams 3 hops deep, and
-each of their owners").
+
+The platform hands lineage, impact, schema history, and discovery to other teams and tools.
+The responses are nested graphs of varying depth, like "this column, its upstreams three hops
+out, and who owns each of them."
 
 ## Decision
-Expose a **GraphQL** API (FastAPI + Strawberry), backed by Neo4j and OpenSearch.
+
+GraphQL, served with FastAPI + Strawberry, over Neo4j and OpenSearch.
 
 ## Why
-- **Variable-depth, nested responses are GraphQL's sweet spot.** A caller asks for exactly the
-  shape and depth it needs in one round trip. The REST equivalent is either many chatty calls
-  or one over-fetching mega-endpoint with ad-hoc depth params.
-- **One typed schema over two backends.** Graph traversal (Neo4j) and discovery (OpenSearch)
-  sit behind a single typed contract, so consumers never care which store answered.
-- **Self-documenting contract.** The GraphQL schema *is* the API docs — valuable for a
-  platform whose consumers are other engineering teams.
 
-## Alternatives considered
-- **REST** — simpler for flat CRUD, but lineage is neither flat nor fixed-depth; we'd
-  reinvent query flexibility badly.
-- **gRPC** — great for internal service-to-service, poor for exploratory human/tool queries
-  of graph shapes. Rejected for the consumer-facing layer.
+Nested, variable-depth responses are exactly what GraphQL is good at. The caller asks for the
+shape and depth it wants in one request. The REST version is either a lot of chatty calls or
+one bloated endpoint with home-grown depth parameters.
 
-## Consequences
-- Slightly more setup than a REST handler; resolver code must guard traversal depth to avoid
-  runaway queries.
-- Caching is per-field rather than per-URL; acceptable at this scale.
+It also puts one typed schema in front of two different backends, so a consumer never has to
+know whether the graph or the search index answered. And the schema doubles as the docs, which
+helps when your users are other engineers.
+
+## What I considered instead
+
+- REST: simpler for flat CRUD, but lineage is neither flat nor fixed-depth, so I'd end up
+  reinventing query flexibility, badly.
+- gRPC: good service-to-service, poor for people and tools exploring graph shapes.
+
+## Trade-offs
+
+A bit more setup than a plain REST handler, and the resolvers have to cap traversal depth so a
+query can't run away. Caching is per-field rather than per-URL, which is fine at this size.

@@ -1,29 +1,33 @@
-# ADR 0001 — Apache Iceberg as the table format (over Delta Lake)
+# 0001 — Iceberg for the table format
 
-**Status:** Accepted · **Date:** 2026-10-11
+Status: accepted · 2026-10-11
 
 ## Context
-We need an open table format over Parquet files in object storage that gives us ACID writes,
-schema evolution, and snapshot history. The two realistic choices are Delta Lake and Apache
-Iceberg (both appear in the target JD).
+
+I need an open table format over Parquet in object storage, with ACID writes, schema
+evolution, and snapshot history. Realistically that's Delta Lake or Iceberg.
 
 ## Decision
-Use **Apache Iceberg** with a **REST catalog**.
+
+Iceberg, with a REST catalog.
 
 ## Why
-- **Metadata is the product here.** This platform's whole job is reading table metadata.
-  Iceberg exposes an exceptionally clean, well-documented metadata layer — snapshots,
-  manifest lists, partition specs, and a full schema-evolution history with schema IDs — all
-  as plain JSON/Avro we can read directly. That makes it the better teaching + building target
-  for a *metadata* platform specifically.
-- **Engine-neutral by design.** Iceberg deliberately avoids coupling to one engine; Delta's
-  richest features historically lean toward Databricks/Spark. For a platform meant to serve
-  "all data pipelines" regardless of engine, engine-neutrality matches the mandate.
-- **Catalog decoupling.** The REST catalog separates "where tables live" from "who reads
-  them," which is the modern production pattern and keeps the demo honest.
 
-## Consequences
-- We run an extra service (Iceberg REST catalog). Acceptable — it mirrors production.
-- Lineage/metadata code targets Iceberg's API; porting to Delta would mean a new reader.
-- Delta remains a valid choice in Databricks-centric shops; this is not a quality judgment,
-  it's a fit judgment for a *metadata-platform* build.
+The whole point of this project is reading table metadata, and Iceberg's metadata is the
+easiest to read: snapshots, manifest lists, partition specs, and the full schema history (with
+schema IDs) all sit there as plain JSON/Avro. For a metadata tool that matters more than
+anything else.
+
+It also isn't tied to one engine. Delta's best features have historically leaned toward
+Databricks and Spark; Iceberg was built engine-neutral from the start, which fits a platform
+meant to serve pipelines regardless of what runs them.
+
+The REST catalog keeps "where tables live" separate from "who reads them," which is how this
+runs in production anyway.
+
+## Trade-offs
+
+Running the REST catalog is one more service, but it mirrors a real setup so I'll take it. The
+metadata-reading code targets Iceberg's API; pointing it at Delta would mean a different
+reader. Delta is still the right call in a Databricks-heavy shop — this is about fit, not which
+one is "better."

@@ -1,5 +1,5 @@
-# Lakehouse Metadata & Lineage Platform — core infrastructure (Phase 01).
-# Airflow is added in Phase 04 (its own compose overlay) to keep the first boot light.
+# Core infrastructure for the lakehouse platform.
+# Airflow comes later in its own compose overlay so the first boot stays light.
 #
 #   bring up:   make up      tear down:   make down     status:  make ps
 name: lakehouse-platform
@@ -12,6 +12,7 @@ volumes:
   minio-data:
   neo4j-data:
   opensearch-data:
+  ivy-cache:
 
 services:
   # ---------------------------------------------------------------- object store
@@ -72,7 +73,7 @@ services:
         condition: service_healthy
     ports:
       - "8888:8888"   # Jupyter
-      - "8080:8080"   # Spark master UI
+      - "8089:8080"   # Spark master UI (8080 is commonly taken on the host)
       - "4040:4040"   # Spark app UI
     environment:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
@@ -82,6 +83,7 @@ services:
       - ./spark-jobs:/opt/spark-jobs
       - ./lineage:/opt/lineage
       - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+      - ivy-cache:/root/.ivy2
     entrypoint: >
       /bin/sh -c "
       notebook &

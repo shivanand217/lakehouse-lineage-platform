@@ -1,10 +1,8 @@
-"""Avro schemas for the synthetic streaming data source.
+"""Avro schemas for the generated data.
 
-Avro is chosen for the *landing* (bronze input) format on purpose: it is row-oriented and
-carries its schema with the data, which is exactly what you want for append-heavy ingest and
-for tolerating schema drift at the edge. The lakehouse then stores the data as columnar
-Parquet inside Iceberg (see spark-jobs). Demonstrating both — and *why* each is used where —
-is part of the point.
+I land the raw data as Avro because it's row-oriented and carries its schema with it, which
+suits append-heavy ingest and a bit of schema drift at the edge. The lakehouse then stores it
+as columnar Parquet inside Iceberg (see spark-jobs). Avro in, Parquet out.
 """
 
 # Fact: one row per playback/ad telemetry event.

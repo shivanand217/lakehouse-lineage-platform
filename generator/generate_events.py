@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Synthetic streaming-telemetry generator — the platform's independent data source.
+"""Generates the streaming telemetry this project runs on.
 
-Produces realistic Disney+/ESPN-style playback sessions as Avro files, plus a small title
-dimension as JSON. This is what makes the whole project self-contained: no external system
-has to exist for the lakehouse to have data.
+Makes Disney+/ESPN-style playback sessions as Avro files, plus a small title dimension as JSON.
+This is what keeps the project self-contained: nothing external has to exist for the lakehouse
+to have data.
 
 Usage
 -----
